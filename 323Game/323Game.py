@@ -48,6 +48,65 @@ class AnimatedSprite(pygame.sprite.Sprite):
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
         self.pos.x, self.pos.y = self.rect.center
 
+class Mob(AnimatedSprite):
+    def __init__(self, x, y):
+        # Sprite sheet dimensions
+        self.sprite_width = 80
+        self.sprite_height = 120
+        self.cols = 2
+        self.rows = 4
+        
+        # Load sprite sheet and create animation frames
+        sprite_sheet = self.load_sprite_sheet("NightBorne.png", self.cols, self.rows)
+        
+        # Organize animations by direction (assuming sprite sheet organization)
+        # Row 0: Down animation (2 frames)
+        # Row 1: Left animation (2 frames)
+        # Row 2: Right animation (2 frames)
+        # Row 3: Up animation (2 frames)
+        self.animations = {
+            "down": sprite_sheet[0:2],
+            "left": sprite_sheet[2:4],
+            "right": sprite_sheet[4:6],
+            "up": sprite_sheet[6:8]
+        }
+        
+        super().__init__((x, y), self.animations["down"])
+
+    def load_sprite_sheet(self, filename, cols, rows):
+        try:
+            full_path = os.path.join("Sprites", filename)
+            sprite_sheet = pygame.image.load(full_path).convert_alpha()
+        except:
+            # Fallback: create a placeholder sprite sheet if the file isn't found
+            print(f"Warning: Could not load {filename}, using placeholder")
+            sprite_sheet = pygame.Surface((cols * self.sprite_width, rows * self.sprite_height), pygame.SRCALPHA)
+            for row in range(rows):
+                for col in range(cols):
+                    x = col * self.sprite_width
+                    y = row * self.sprite_height
+                    color = (row * 60 % 255, 100 + col * 30 % 155, 50 + (row + col) * 20 % 205)
+                    pygame.draw.rect(sprite_sheet, color, (x, y, self.sprite_width, self.sprite_height))
+                    pygame.draw.rect(sprite_sheet, BLACK, (x, y, self.sprite_width, self.sprite_height), 1)
+                    # Draw direction indicator
+                    font = pygame.font.SysFont(None, 20)
+                    direction = ["Down", "Left", "Right", "Up"][row]
+                    text = font.render(f"{direction} {col+1}", True, BLACK)
+                    sprite_sheet.blit(text, (x + 5, y + 5))
+        
+        frames = []
+        for row in range(rows):
+            for col in range(cols):
+                frame = pygame.Surface((self.sprite_width, self.sprite_height), pygame.SRCALPHA)
+                frame.blit(sprite_sheet, (0, 0),
+                          (col * self.sprite_width,
+                           row * self.sprite_height,
+                           self.sprite_width,
+                           self.sprite_height))
+                frames.append(frame)
+        
+        return frames
+
 class Player(AnimatedSprite):
     def __init__(self, x, y):
         # Sprite sheet dimensions
@@ -156,6 +215,12 @@ all_sprites = pygame.sprite.Group()
 player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 all_sprites.add(player)
 
+mobs = pygame.sprite.Group()
+for i in range(5):
+    mob = Mob(i * 100 + 100, i * 100 + 100)
+    all_sprites.add(mob)
+    mobs.add(mob)
+
 # Game loop
 running = True
 dt = 0  # Delta time
@@ -187,5 +252,10 @@ while running:
     
     # Cap FPS and get delta time
     dt = clock.tick(FPS) / 1000
+    collisions = pygame.sprite.spritecollide(player, mobs, False)
+    # check collisions for game window
+    if collisions:
+        running = False
+
 
 pygame.quit()
