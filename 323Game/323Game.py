@@ -196,7 +196,7 @@ class Mob(AnimatedSprite):
         super().__init__((x, y), self.animations["down"])
 
         # Speed of mob
-        self.speed = 3  # Fixed speed for simplicity
+        self.speed = 1.5  # Fixed speed for simplicity
 
     def load_sprite_sheet(self, filename, cols, rows):
         try:
@@ -254,7 +254,7 @@ all_sprites = pygame.sprite.Group()
 player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 all_sprites.add(player)
 
-music = MusicPlayer("Molgera.mp3")
+music = MusicPlayer("2.Aria of the Soul(P4aa).mp3")
 music.play()
 
 mobs = pygame.sprite.Group()
