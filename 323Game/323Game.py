@@ -35,6 +35,14 @@ def draw_text(surface, text, size, color, x, y, center=True):
         text_rect = text_surface.get_rect(topleft=(x, y))
     surface.blit(text_surface, text_rect)
 
+def draw_map(surface, tmx_data):
+    for layer in tmx_data.visible_layers:
+        if isinstance(layer, pytmx.TiledTileLayer):
+            for x, y, gid in layer:
+                tile = tmx_data.get_tile_image_by_gid(gid)
+                if tile:
+                    surface.blit(tile, (x * tmx_data.tilewidth, y * tmx_data.tileheight))
+
 def show_start_screen():
     screen.fill(BLACK)
     draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
@@ -557,6 +565,9 @@ def main():
     if not show_start_screen():
         return
     
+    # Load the tmx map
+    tmx_data = pytmx.util_pygame.load_pygame(os.path.join("Maps", "LSBNR_MainMap.tmx"))
+    
     suspicion_system = SuspicionSystem()
     wheel_cipher = WheelCipher()
     
@@ -566,17 +577,17 @@ def main():
         walls = pygame.sprite.Group()
         signs = pygame.sprite.Group()
 
-        wall_positions = [
-            (100, 100, 200, 50),
-            (400, 300, 50, 200),
-            (700, 200, 200, 50),
-            (900, 500, 300, 50)
-        ]
+        #wall_positions = [
+        #    (100, 100, 200, 50),
+        #    (400, 300, 50, 200),
+        #    (700, 200, 200, 50),
+        #    (900, 500, 300, 50)
+        #]
 
-        for x, y, w, h in wall_positions:
-            wall = Wall(x, y, w, h)
-            all_sprites.add(wall)
-            walls.add(wall)
+        #for x, y, w, h in wall_positions:
+        #    wall = Wall(x, y, w, h)
+        #    all_sprites.add(wall)
+        #    walls.add(wall)
 
         sign1 = Sign(300, 200, 
                     "Welcome to Lone Voyager! Press O to interact with signs.",
@@ -659,6 +670,7 @@ def main():
                 playing = False
             
             screen.fill(BLACK)
+            draw_map(screen, tmx_data)
             all_sprites.draw(screen)
             
             if player.can_interact:
