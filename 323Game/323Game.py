@@ -2,7 +2,9 @@ import math
 import random
 import pygame
 import os
-import pytmx
+#import pytmx
+
+
 
 # Initialize pygame
 pygame.init()
@@ -329,9 +331,13 @@ class Mob(AnimatedSprite):
         self.cols = 4
         self.rows = 1
 
+        # Movement variables
+        self.wander_speed = 50
+        self.wander_time = 0
+        self.wander_direction = pygame.Vector2(0, 0)
         self.chasing = False
         self.chase_distance = 200
-        self.chase_speed = 150
+        self.chase_speed = 200
         
         # Load sprite sheet and create animation frames
         sprite_sheet = self.load_sprite_sheet("Golem_Run.png", self.cols, self.rows)
@@ -382,20 +388,29 @@ class Mob(AnimatedSprite):
             if dist < self.chase_distance:
                 self.chasing = True
                 self.speed = self.chase_speed
+                self.chase_distance = 300
             else:
-                return
+                self.wander_time -= dt
+                if self.wander_time <= 0:
+                    self.wander_direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+                    self.wander_direction = self.wander_direction.normalize()
+                    self.wander_time = random.uniform(2, 5)
+                
+                self.direction = self.wander_direction
+                self.speed = self.wander_speed
         else:
             if dist > self.chase_distance:
                 self.chasing = False
                 self.speed = 100
+                self.chase_distance = 200
                 return
         
         
-        if dist > 0:
-            # Normalize direction
-            dx /= dist
-            dy /= dist
-            self.direction = pygame.Vector2(dx, dy)
+            if dist > 0:
+                # Normalize direction
+                dx /= dist
+                dy /= dist
+                self.direction = pygame.Vector2(dx, dy)
         
         # Call parent class update and get old position
         old_pos = super().update(dt)
