@@ -438,6 +438,11 @@ class Mob(AnimatedSprite):
             self.speed = self.base_speed * suspicion_modifier
     
     def update(self, dt, player, walls):
+         # Get direction to player
+        dx = player.rect.centerx - self.rect.centerx
+        dy = player.rect.centery - self.rect.centery
+        dist = math.sqrt(dx**2 + dy**2)
+        
         if not self.chasing:
             if dist < self.chase_distance:
                 self.chasing = True
