@@ -567,7 +567,7 @@ def main():
         return
     
     # Load the tmx map
-    tmx_data = pytmx.util_pygame.load_pygame(os.path.join("Maps", "LSBNR_MainMap.tmx"))
+    tmx_data = pytmx.util_pygame.load_pygame(os.path.join("Maps", "TLSBNR_MainMap.tmx"))
     
     suspicion_system = SuspicionSystem()
     wheel_cipher = WheelCipher()
