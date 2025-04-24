@@ -295,7 +295,7 @@ class SuspicionSystem:
         
         font = pygame.font.Font(None, 24)
         text = font.render("SUSPICION", True, WHITE)
-        surface.blit(text, (meter_x, meter_y - 25))
+        surface.blit(text, (meter_x, meter_y + 25))
 
 class Wall(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
@@ -667,7 +667,10 @@ def main():
 
         # Create walls
         wall_positions = [
-            (500, 500, 200, 50),
+            (50, 1000, 1000, 100),
+            (2050, 1000, 1000, 100),
+            (950, 1000, 100, 2000),
+            (2050, 1000, 100, 2000),
             (800, 700, 50, 200),
             (1100, 600, 200, 50),
             (1300, 900, 300, 50),
