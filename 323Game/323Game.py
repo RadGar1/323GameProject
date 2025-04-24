@@ -192,6 +192,10 @@ class Mob(AnimatedSprite):
         self.sprite_height = 64
         self.cols = 4
         self.rows = 1
+
+        self.chasing = False
+        self.chase_distance = 200
+        self.chase_speed = 150
         
         # Load sprite sheet and create animation frames
         sprite_sheet = self.load_sprite_sheet("Golem_Run.png", self.cols, self.rows)
@@ -237,6 +241,13 @@ class Mob(AnimatedSprite):
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
         dist = math.sqrt(dx**2 + dy**2)
+
+        if not self.chasing:
+            if dist < self.chase_distance:
+                self.chasing = True
+                self.speed = self.chase_speed
+            else:
+                return
         
         if dist > 0:
             # Normalize direction
