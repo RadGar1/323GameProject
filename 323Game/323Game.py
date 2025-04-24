@@ -625,17 +625,24 @@ def main():
         walls = pygame.sprite.Group()
         signs = pygame.sprite.Group()
 
-        wall_positions = [
-            (100, 100, 200, 50),
-            (400, 300, 50, 200),
-            (700, 200, 200, 50),
-            (900, 500, 300, 50)
-        ]
+        # Create walls from map objects
+        for obj in tmx_data.objects:
+            if obj.name == "Wall":
+                wall = Wall(obj.x, obj.y, obj.width, obj.height)
+                all_sprites.add(wall)
+                walls.add(wall)
 
-        for x, y, w, h in wall_positions:
-            wall = Wall(x, y, w, h)
-            all_sprites.add(wall)
-            walls.add(wall)
+        #wall_positions = [
+        #    (100, 100, 200, 50),
+        #    (400, 300, 50, 200),
+        #    (700, 200, 200, 50),
+        #    (900, 500, 300, 50)
+        #]
+
+        #for x, y, w, h in wall_positions:
+        #    wall = Wall(x, y, w, h)
+        #    all_sprites.add(wall)
+        #    walls.add(wall)
 
         sign1 = Sign(300, 200, 
                     "Welcome to Lone Voyager! Press O to interact with signs.",
