@@ -23,25 +23,33 @@ YELLOW = (255, 255, 0)
 
 # Setup the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Adventure Game")
+pygame.display.set_caption("Lone Voyager")
 clock = pygame.time.Clock()
 
 # Music files
 default_music = "2.Aria of the Soul(P4).mp3"
 chase_music = "Hollow Knight OST.mp3"
 
-def draw_text(surface, text, size, color, x, y):
-    font = pygame.font.Font(None, size)
-    text_surface = font.render(text, True, color)
+# Font sizes
+pixel_font13 = pygame.font.Font("PressStart2P-Regular.ttf", 13)
+pixel_font16 = pygame.font.Font("PressStart2P-Regular.ttf", 16)
+pixel_font24 = pygame.font.Font("PressStart2P-Regular.ttf", 24)
+pixel_font36 = pygame.font.Font("PressStart2P-Regular.ttf", 36)
+pixel_font64 = pygame.font.Font("PressStart2P-Regular.ttf", 64)
+
+def draw_text(surface, text, size, color, x, y, font=None):
+    if font is None:
+        font = pygame.font.Font(None, size) # Fallback
+    text_surface = font.render(text, False, color)
     text_rect = text_surface.get_rect(center=(x, y))
     surface.blit(text_surface, text_rect)
 
 def show_start_screen():
     screen.fill(BLACK)
-    draw_text(screen, "ADVENTURE GAME", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
-    draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-    draw_text(screen, "Press O to interact with objects", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
-    draw_text(screen, "Press any key to begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4)
+    draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4, font=pixel_font64)
+    draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, font=pixel_font36)
+    draw_text(screen, "Press O to Interact with Objects", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, font=pixel_font36)
+    draw_text(screen, "Press Any Key to Begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4, font=pixel_font36)
     pygame.display.flip()
     
     waiting = True
@@ -57,8 +65,8 @@ def show_start_screen():
 
 def show_game_over_screen():
     screen.fill(BLACK)
-    draw_text(screen, "GAME OVER", 64, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
-    draw_text(screen, "Press any key to play again", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    draw_text(screen, "GAME OVER", 64, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4, font=pixel_font64)
+    draw_text(screen, "Press Any Key to Play Again", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, font=pixel_font36)
     pygame.display.flip()
     
     waiting = True
@@ -105,11 +113,11 @@ def show_message_screen(message):
     # Draw each line of text
     y_offset = message_rect.y + 20
     for line in lines:
-        draw_text(screen, line, 36, BLACK, SCREEN_WIDTH // 2, y_offset)
+        draw_text(screen, line, 13, BLACK, SCREEN_WIDTH // 2, y_offset, font=pixel_font13)
         y_offset += 40
     
     # Draw instruction to continue
-    draw_text(screen, "Press ENTER to continue", 36, BLACK, SCREEN_WIDTH // 2, message_rect.bottom - 40)
+    draw_text(screen, "Press ENTER to continue", 24, BLACK, SCREEN_WIDTH // 2, message_rect.bottom - 40, font=pixel_font24)
     
     pygame.display.flip()
     
@@ -508,7 +516,7 @@ def main():
             
             # Show interaction prompt if near a sign
             if player.can_interact:
-                draw_text(screen, "Press O to read", 24, WHITE, player.rect.centerx, player.rect.top - 20)
+                draw_text(screen, "Press O to read", 16, WHITE, player.rect.centerx, player.rect.top - 20, font=pixel_font16)
             
             # Flip display
             pygame.display.flip()
