@@ -2,9 +2,7 @@ import math
 import random
 import pygame
 import os
-#import pytmx
-
-
+import sys
 
 # Initialize pygame
 pygame.init()
@@ -32,26 +30,18 @@ clock = pygame.time.Clock()
 default_music = "2.Aria of the Soul(P4).mp3"
 chase_music = "Hollow Knight OST.mp3"
 
-# Font sizes
-pixel_font13 = pygame.font.Font("PressStart2P-Regular.ttf", 13)
-pixel_font16 = pygame.font.Font("PressStart2P-Regular.ttf", 16)
-pixel_font24 = pygame.font.Font("PressStart2P-Regular.ttf", 24)
-pixel_font36 = pygame.font.Font("PressStart2P-Regular.ttf", 36)
-pixel_font64 = pygame.font.Font("PressStart2P-Regular.ttf", 64)
-
-def draw_text(surface, text, size, color, x, y, font=None):
-    if font is None:
-        font = pygame.font.Font(None, size) # Fallback
-    text_surface = font.render(text, False, color)
+def draw_text(surface, text, size, color, x, y):
+    font = pygame.font.Font(None, size)
+    text_surface = font.render(text, True, color)
     text_rect = text_surface.get_rect(center=(x, y))
     surface.blit(text_surface, text_rect)
 
 def show_start_screen():
     screen.fill(BLACK)
-    draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4, font=pixel_font64)
-    draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, font=pixel_font36)
-    draw_text(screen, "Press O to Interact with Objects", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, font=pixel_font36)
-    draw_text(screen, "Press Any Key to Begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4, font=pixel_font36)
+    draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
+    draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    draw_text(screen, "Press O to interact with objects", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
+    draw_text(screen, "Press any key to begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4)
     pygame.display.flip()
     
     waiting = True
@@ -67,8 +57,8 @@ def show_start_screen():
 
 def show_game_over_screen():
     screen.fill(BLACK)
-    draw_text(screen, "GAME OVER", 64, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4, font=pixel_font64)
-    draw_text(screen, "Press Any Key to Play Again", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, font=pixel_font36)
+    draw_text(screen, "GAME OVER", 64, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
+    draw_text(screen, "Press any key to play again", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
     pygame.display.flip()
     
     waiting = True
@@ -115,11 +105,11 @@ def show_message_screen(message):
     # Draw each line of text
     y_offset = message_rect.y + 20
     for line in lines:
-        draw_text(screen, line, 13, BLACK, SCREEN_WIDTH // 2, y_offset, font=pixel_font13)
+        draw_text(screen, line, 36, BLACK, SCREEN_WIDTH // 2, y_offset)
         y_offset += 40
     
     # Draw instruction to continue
-    draw_text(screen, "Press ENTER to continue", 24, BLACK, SCREEN_WIDTH // 2, message_rect.bottom - 40, font=pixel_font24)
+    draw_text(screen, "Press ENTER to continue", 36, BLACK, SCREEN_WIDTH // 2, message_rect.bottom - 40)
     
     pygame.display.flip()
     
@@ -235,6 +225,13 @@ class Player(AnimatedSprite):
         self.can_interact = False
         self.near_sign = None
         
+        # Stun mechanic properties
+        self.stun_cooldown = 0
+        self.stun_radius = 150
+        self.stun_duration = 3.0
+        self.stun_cooldown_time = 5.0
+        self.stun_sound = None  # You can load a sound file here
+        
     def load_sprite_sheet(self, filename, cols, rows):
         try:
             full_path = os.path.join("Sprites", filename)
@@ -267,7 +264,7 @@ class Player(AnimatedSprite):
                 frames.append(frame)
         return frames
     
-    def update(self, dt, walls, signs):
+    def update(self, dt, walls, signs, mobs=None):
         # Get keyboard input
         keys = pygame.key.get_pressed()
         move_vec = pygame.Vector2(0, 0)
@@ -284,6 +281,11 @@ class Player(AnimatedSprite):
         if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
             move_vec.x += 1
             self.last_direction = "right"
+            
+        # Handle stun input
+        if keys[pygame.K_p] and self.stun_cooldown <= 0 and mobs:
+            self.stun_nearby_mobs(mobs)
+            self.stun_cooldown = self.stun_cooldown_time
             
         self.direction = move_vec
         
@@ -322,6 +324,21 @@ class Player(AnimatedSprite):
                 self.can_interact = True
                 self.near_sign = sign
                 break
+        
+        # Update stun cooldown
+        if self.stun_cooldown > 0:
+            self.stun_cooldown -= dt
+    
+    def stun_nearby_mobs(self, mobs):
+        for mob in mobs:
+            # distance to mob
+            dx = mob.rect.centerx - self.rect.centerx
+            dy = mob.rect.centery - self.rect.centery
+            distance = math.sqrt(dx**2 + dy**2)
+            
+            if distance <= self.stun_radius:
+                mob.get_stunned(self.stun_duration)
+                # sound effect goes here
 
 class Mob(AnimatedSprite):
     def __init__(self, x, y):
@@ -331,13 +348,17 @@ class Mob(AnimatedSprite):
         self.cols = 4
         self.rows = 1
 
-        # Movement variables
-        self.wander_speed = 50
-        self.wander_time = 0
-        self.wander_direction = pygame.Vector2(0, 0)
         self.chasing = False
         self.chase_distance = 200
-        self.chase_speed = 200
+        self.chase_speed = 150
+        
+        # Stun properties
+        self.stunned = False
+        self.stun_timer = 0
+        self.original_speed = 100
+        self.stunned_speed = 0
+        self.normal_color = (255, 255, 255)  # Default color
+        self.stunned_color = (100, 100, 255)  # Blue tint when stunned
         
         # Load sprite sheet and create animation frames
         sprite_sheet = self.load_sprite_sheet("Golem_Run.png", self.cols, self.rows)
@@ -348,7 +369,7 @@ class Mob(AnimatedSprite):
         }
         
         super().__init__((x, y), self.animations["right"])
-        self.speed = 100  # Reduced speed for better collision handling
+        self.speed = self.original_speed
         
     def load_sprite_sheet(self, filename, cols, rows):
         try:
@@ -379,53 +400,69 @@ class Mob(AnimatedSprite):
         return frames
     
     def update(self, dt, player, walls):
-        # Get direction to player
-        dx = player.rect.centerx - self.rect.centerx
-        dy = player.rect.centery - self.rect.centery
-        dist = math.sqrt(dx**2 + dy**2)
-
-        if not self.chasing:
-            if dist < self.chase_distance:
-                self.chasing = True
-                self.speed = self.chase_speed
-                self.chase_distance = 300
-            else:
-                self.wander_time -= dt
-                if self.wander_time <= 0:
-                    self.wander_direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
-                    if self.wander_direction.length() > 0:
-                        self.wander_direction = self.wander_direction.normalize()
-                    self.wander_time = random.uniform(2, 5)
+        # Handle stun timer
+        if self.stunned:
+            self.stun_timer -= dt
+            if self.stun_timer <= 0:
+                self.stunned = False
+                self.speed = self.original_speed
+                # Reset color when stun wears off
+                for frame in self.frames:
+                    frame.fill(self.normal_color, special_flags=pygame.BLEND_MULT)
+        
+        # Only move if not stunned
+        if not self.stunned:
+            if not self.chasing:
+                # Check if player is within chase distance
+                dx = player.rect.centerx - self.rect.centerx
+                dy = player.rect.centery - self.rect.centery
+                dist = math.sqrt(dx**2 + dy**2)
                 
-                self.direction = self.wander_direction
-                self.speed = self.wander_speed
-        else:
-            if dist > self.chase_distance:
-                self.chasing = False
-                self.speed = 100
-                self.chase_distance = 200
-                #return
+                if dist < self.chase_distance:
+                    self.chasing = True
+                    self.speed = self.chase_speed
             else:
+                # Get direction to player
+                dx = player.rect.centerx - self.rect.centerx
+                dy = player.rect.centery - self.rect.centery
+                dist = math.sqrt(dx**2 + dy**2)
+                
                 if dist > 0:
-                # Normalize direction
+                    # Normalize direction
                     dx /= dist
                     dy /= dist
                     self.direction = pygame.Vector2(dx, dy)
+                
+                # Check if player is too far away
+                if dist > self.chase_distance * 1.5:
+                    self.chasing = False
+                    self.speed = self.original_speed
         
-        # Call parent class update and get old position
-        old_pos = super().update(dt)
-        
-        # Check for collisions with walls
-        wall_collisions = pygame.sprite.spritecollide(self, walls, False)
-        if wall_collisions:
-            # Move back if colliding
-            self.pos = old_pos
-            self.rect.center = self.pos
-        
-        # If mob moves out of screen, reset position
-        if self.rect.top > SCREEN_HEIGHT + 15 or self.rect.left < -15 or self.rect.right > SCREEN_WIDTH + 15:
-            self.rect.x = random.randrange(SCREEN_WIDTH - self.sprite_width)
-            self.rect.y = random.randrange(-100, -50)
+            # Call parent class update and get old position
+            old_pos = super().update(dt)
+            
+            # Check for collisions with walls
+            wall_collisions = pygame.sprite.spritecollide(self, walls, False)
+            if wall_collisions:
+                # Move back if colliding
+                self.pos = old_pos
+                self.rect.center = self.pos
+            
+            # If mob moves out of screen, reset position
+            if self.rect.top > SCREEN_HEIGHT + 15 or self.rect.left < -15 or self.rect.right > SCREEN_WIDTH + 15:
+                self.rect.x = random.randrange(SCREEN_WIDTH - self.sprite_width)
+                self.rect.y = random.randrange(-100, -50)
+                self.chasing = False
+                self.speed = self.original_speed
+    
+    def get_stunned(self, duration):
+        self.stunned = True
+        self.stun_timer = duration
+        self.speed = self.stunned_speed
+        # Change color to indicate stun status
+        for frame in self.frames:
+            frame.fill(self.stunned_color, special_flags=pygame.BLEND_MULT)
+
 
 def main():
     # Show the start screen
@@ -454,8 +491,8 @@ def main():
             walls.add(wall)
 
         # Create signs with messages
-        sign1 = Sign(300, 200, "Welcome to the adventure game! Press O to interact with signs like this one.")
-        sign2 = Sign(800, 400, "This is another sign with different text. Explore and find all the secrets!")
+        sign1 = Sign(300, 200, "Welcome to Lone Voyager! Press O to interact with signs.")
+        sign2 = Sign(800, 400, "Press P to stun nearby enemies when they chase you!")
         all_sprites.add(sign1)
         all_sprites.add(sign2)
         signs.add(sign1)
@@ -464,13 +501,11 @@ def main():
         player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
         all_sprites.add(player)
 
-        defaultMusic = MusicPlayer(default_music)
-        chaseMusic = MusicPlayer(chase_music)
-
-        defaultMusic.play()
-        defaultMusic.set_Volume(1.0)
-
-        
+        # Music setup
+        default_music = MusicPlayer("2.Aria of the Soul(P4).mp3")
+        chase_music = MusicPlayer("Hollow Knight OST.mp3")
+        default_music.play()
+        default_music.set_Volume(1.0)
         
         mobs = pygame.sprite.Group()
         for i in range(5):
@@ -481,6 +516,7 @@ def main():
         # Game play loop
         playing = True
         dt = 0
+        chase_music_playing = False
         
         while playing:
             # Event handling
@@ -499,27 +535,28 @@ def main():
                             running = False
             
             # Update
-            player.update(dt, walls, signs)
-                        # Add a flag to track whether chase music is playing
-            chase_music_playing = False
+            player.update(dt, walls, signs, mobs)
             
-            # Inside the game loop
+            # Check if any mobs are chasing to switch music
+            any_chasing = False
             for mob in mobs:
-                    mob.update(dt, player, walls)
-                    if mob.chasing:
-                        if not chase_music_playing:
-                            defaultMusic.stop()
-                            chaseMusic.play()
-                            chaseMusic.set_Volume(1.0)
-                            chase_music_playing = True
-                        break
+                mob.update(dt, player, walls)
+                if mob.chasing and not mob.stunned:
+                    any_chasing = True
+            
+            # Handle music transitions
+            if any_chasing:
+                if not chase_music_playing:
+                    default_music.stop()
+                    chase_music.play()
+                    chase_music.set_Volume(1.0)
+                    chase_music_playing = True
             else:
-                    if chase_music_playing:
-                        chaseMusic.stop()
-                        defaultMusic.play()
-                        chase_music_playing = False
-
-                        
+                if chase_music_playing:
+                    chase_music.stop()
+                    default_music.play()
+                    chase_music_playing = False
+            
             # Check player-mob collisions
             collisions = pygame.sprite.spritecollide(player, mobs, False)
             if collisions:
@@ -531,7 +568,16 @@ def main():
             
             # Show interaction prompt if near a sign
             if player.can_interact:
-                draw_text(screen, "Press O to read", 16, WHITE, player.rect.centerx, player.rect.top - 20, font=pixel_font16)
+                draw_text(screen, "Press O to read", 24, WHITE, player.rect.centerx, player.rect.top - 20)
+            
+            # Draw stun cooldown indicator
+            if player.stun_cooldown > 0:
+                cooldown_width = 200 * (1 - player.stun_cooldown / player.stun_cooldown_time)
+                pygame.draw.rect(screen, RED, (10, 10, cooldown_width, 20))
+                pygame.draw.rect(screen, WHITE, (10, 10, 200, 20), 2)
+                draw_text(screen, "Stun Cooldown", 20, WHITE, 110, 20)
+            else:
+                draw_text(screen, "Press P to stun nearby enemies", 24, WHITE, SCREEN_WIDTH // 2, 30)
             
             # Flip display
             pygame.display.flip()
@@ -539,7 +585,9 @@ def main():
             # Cap FPS and get delta time
             dt = clock.tick(FPS) / 1000
         
-        defaultMusic.stop()
+        default_music.stop()
+        if chase_music_playing:
+            chase_music.stop()
         
         # Show game over screen if not quitting
         if running:
