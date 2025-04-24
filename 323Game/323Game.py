@@ -15,10 +15,18 @@ PLAYER_SPEED = 300
 # Colors
 BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)  # Color for walls
 
 # Setup the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 clock = pygame.time.Clock()
+
+class Wall(pygame.sprite.Sprite):
+    def __init__(self, x, y, width, height):
+        super().__init__()
+        self.image = pygame.Surface((width, height))
+        self.image.fill(BLUE)
+        self.rect = self.image.get_rect(topleft=(x, y))
 
 class MusicPlayer(object):
     def __init__(self, music_file):
@@ -37,7 +45,6 @@ class MusicPlayer(object):
             pygame.mixer.music.stop()
             self.is_playing = False
 
-
 class AnimatedSprite(pygame.sprite.Sprite):
     def __init__(self, position, frames, animation_speed=0.1):
         super().__init__()
@@ -49,6 +56,7 @@ class AnimatedSprite(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=position)
         self.pos = pygame.Vector2(position)
         self.direction = pygame.Vector2(0, 0)
+        self.speed = PLAYER_SPEED
         
     def update(self, dt):
         # Animation update
@@ -61,12 +69,19 @@ class AnimatedSprite(pygame.sprite.Sprite):
         # Position update
         if self.direction.length() > 0:
             self.direction = self.direction.normalize()
-        self.pos += self.direction * PLAYER_SPEED * dt
+        
+        # Store old position for collision handling
+        old_pos = self.pos.copy()
+        
+        # Update position
+        self.pos += self.direction * self.speed * dt
         self.rect.center = self.pos
         
-        # Keep player on screen
+        # Keep sprite on screen
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
         self.pos.x, self.pos.y = self.rect.center
+        
+        return old_pos
 
 class Player(AnimatedSprite):
     def __init__(self, x, y):
@@ -79,12 +94,8 @@ class Player(AnimatedSprite):
         # Load sprite sheet and create animation frames
         sprite_sheet = self.load_sprite_sheet("player.png", self.cols, self.rows)
         
-        # Organize animations by direction (assuming sprite sheet organization)
-        # Row 0: Down animation (2 frames)
-        # Row 1: Left animation (2 frames)
-        # Row 2: Right animation (2 frames)
-        # Row 3: Up animation (2 frames)
-        self.animations = { #all 2 frames
+        # Organize animations by direction
+        self.animations = {
             "down": sprite_sheet[0:2],
             "left": sprite_sheet[2:4],
             "right": sprite_sheet[4:6],
@@ -94,14 +105,13 @@ class Player(AnimatedSprite):
         super().__init__((x, y), self.animations["down"])
         self.current_animation = "down"
         self.last_direction = "down"
-        self.speed = PLAYER_SPEED
         
     def load_sprite_sheet(self, filename, cols, rows):
         try:
             full_path = os.path.join("Sprites", filename)
             sprite_sheet = pygame.image.load(full_path).convert_alpha()
         except:
-            # Fallback: create a placeholder sprite sheet if the file isn't found
+            # Fallback: create a placeholder sprite sheet
             print(f"Warning: Could not load {filename}, using placeholder")
             sprite_sheet = pygame.Surface((cols * self.sprite_width, rows * self.sprite_height), pygame.SRCALPHA)
             for row in range(rows):
@@ -111,7 +121,6 @@ class Player(AnimatedSprite):
                     color = (row * 60 % 255, 100 + col * 30 % 155, 50 + (row + col) * 20 % 205)
                     pygame.draw.rect(sprite_sheet, color, (x, y, self.sprite_width, self.sprite_height))
                     pygame.draw.rect(sprite_sheet, BLACK, (x, y, self.sprite_width, self.sprite_height), 1)
-                    # Draw direction indicator
                     font = pygame.font.SysFont(None, 20)
                     direction = ["Down", "Left", "Right", "Up"][row]
                     text = font.render(f"{direction} {col+1}", True, BLACK)
@@ -127,12 +136,9 @@ class Player(AnimatedSprite):
                            self.sprite_width,
                            self.sprite_height))
                 frames.append(frame)
-        
         return frames
-
-# The rest of your game loop remains the same
     
-    def update(self, dt):
+    def update(self, dt, walls):
         # Get keyboard input
         keys = pygame.key.get_pressed()
         move_vec = pygame.Vector2(0, 0)
@@ -169,7 +175,15 @@ class Player(AnimatedSprite):
                 self.frames = self.animations[self.last_direction]
                 self.current_frame = 0
         
-        super().update(dt)
+        # Call parent class update and get old position
+        old_pos = super().update(dt)
+        
+        # Check for collisions with walls
+        wall_collisions = pygame.sprite.spritecollide(self, walls, False)
+        if wall_collisions:
+            # Move back if colliding
+            self.pos = old_pos
+            self.rect.center = self.pos
 
 class Mob(AnimatedSprite):
     def __init__(self, x, y):
@@ -178,32 +192,24 @@ class Mob(AnimatedSprite):
         self.sprite_height = 64
         self.cols = 4
         self.rows = 1
-
-        # Starting position of the mob
-        self.rect = pygame.Rect(x, y, self.sprite_width, self.sprite_height)
         
         # Load sprite sheet and create animation frames
         sprite_sheet = self.load_sprite_sheet("Golem_Run.png", self.cols, self.rows)
         
-        # Organize animations by direction
+        # Organize animations
         self.animations = {
-            "down": sprite_sheet[0:2],
-            "left": sprite_sheet[2:4],
-            "right": sprite_sheet[4:6],
-            "up": sprite_sheet[6:8]
+            "right": sprite_sheet  # Just use all frames for simple animation
         }
         
-        super().__init__((x, y), self.animations["down"])
-
-        # Speed of mob
-        self.speed = 1.5  # Fixed speed for simplicity
-
+        super().__init__((x, y), self.animations["right"])
+        self.speed = 100  # Reduced speed for better collision handling
+        
     def load_sprite_sheet(self, filename, cols, rows):
         try:
             full_path = os.path.join("Sprites", filename)
             sprite_sheet = pygame.image.load(full_path).convert_alpha()
         except:
-            # Fallback: create a placeholder sprite sheet if the file isn't found
+            # Fallback: create a placeholder sprite sheet
             print(f"Warning: Could not load {filename}, using placeholder")
             sprite_sheet = pygame.Surface((cols * self.sprite_width, rows * self.sprite_height), pygame.SRCALPHA)
             for row in range(rows):
@@ -213,6 +219,7 @@ class Mob(AnimatedSprite):
                     color = (row * 60 % 255, 100 + col * 30 % 155, 50 + (row + col) * 20 % 205)
                     pygame.draw.rect(sprite_sheet, color, (x, y, self.sprite_width, self.sprite_height))
                     pygame.draw.rect(sprite_sheet, (0, 0, 0), (x, y, self.sprite_width, self.sprite_height), 1)
+        
         frames = []
         for row in range(rows):
             for col in range(cols):
@@ -224,42 +231,60 @@ class Mob(AnimatedSprite):
                            self.sprite_height))
                 frames.append(frame)
         return frames
-
-    def update(self, dt, player):
-        # Get the direction to the player
+    
+    def update(self, dt, player, walls):
+        # Get direction to player
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
+        dist = math.sqrt(dx**2 + dy**2)
         
-        # Calculate distance to the player
-        distance = math.sqrt(dx**2 + dy**2)
-
-        # Prevent division by zero if distance is zero (same position)
-        if distance != 0:
-            # Normalize direction (unit vector)
-            dx /= distance
-            dy /= distance
-
-            # Update the mob's position to move towards the player
-            self.rect.x += dx * self.speed
-            self.rect.y += dy * self.speed
-
-        # If mob moves out of screen, reset position to top
+        if dist > 0:
+            # Normalize direction
+            dx /= dist
+            dy /= dist
+            self.direction = pygame.Vector2(dx, dy)
+        
+        # Call parent class update and get old position
+        old_pos = super().update(dt)
+        
+        # Check for collisions with walls
+        wall_collisions = pygame.sprite.spritecollide(self, walls, False)
+        if wall_collisions:
+            # Move back if colliding
+            self.pos = old_pos
+            self.rect.center = self.pos
+        
+        # If mob moves out of screen, reset position
         if self.rect.top > SCREEN_HEIGHT + 15 or self.rect.left < -15 or self.rect.right > SCREEN_WIDTH + 15:
             self.rect.x = random.randrange(SCREEN_WIDTH - self.sprite_width)
             self.rect.y = random.randrange(-100, -50)
 
-
 # Game setup
 all_sprites = pygame.sprite.Group()
+walls = pygame.sprite.Group()  # Group for walls
+
+# Create some walls
+wall_positions = [
+    (100, 100, 200, 50),
+    (400, 300, 50, 200),
+    (700, 200, 200, 50),
+    (900, 500, 300, 50)
+]
+
+for x, y, w, h in wall_positions:
+    wall = Wall(x, y, w, h)
+    all_sprites.add(wall)
+    walls.add(wall)
+
 player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 all_sprites.add(player)
 
-music = MusicPlayer("2.Aria of the Soul(P4aa).mp3")
+music = MusicPlayer("2.Aria of the Soul(P4).mp3")
 music.play()
 
 mobs = pygame.sprite.Group()
 for i in range(5):
-    mob = Mob(i * 100 + 100, i * 100 + 100)
+    mob = Mob(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT))
     all_sprites.add(mob)
     mobs.add(mob)
 
@@ -277,30 +302,24 @@ while running:
                 running = False
     
     # Update
-    #all_sprites.update(dt)
-    player.update(dt)
+    player.update(dt, walls)
     for mob in mobs:
-        mob.update(dt, player)
+        mob.update(dt, player, walls)
+    
+    # Check player-mob collisions
+    collisions = pygame.sprite.spritecollide(player, mobs, False)
+    if collisions:
+        print("Player hit by mob!")
+        running = False
     
     # Render
     screen.fill(BLACK)
     all_sprites.draw(screen)
-    
-    # Debug info
-    #font = pygame.font.SysFont(None, 36)
-    #debug_text = f"FPS: {int(clock.get_fps())} | Pos: {int(player.pos.x)}, {int(player.pos.y)}"
-    #debug_surface = font.render(debug_text, True, GREEN)
-    #screen.blit(debug_surface, (10, 10))
     
     # Flip display
     pygame.display.flip()
     
     # Cap FPS and get delta time
     dt = clock.tick(FPS) / 1000
-    collisions = pygame.sprite.spritecollide(player, mobs, False)
-    # check collisions for game window
-    if collisions:
-        running = False
-
 
 pygame.quit()
