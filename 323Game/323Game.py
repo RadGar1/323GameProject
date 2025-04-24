@@ -25,6 +25,10 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Adventure Game")
 clock = pygame.time.Clock()
 
+# Music files
+default_music = "2.Aria of the Soul(P4).mp3"
+chase_music = "Hollow Knight OST.mp3"
+
 def draw_text(surface, text, size, color, x, y):
     font = pygame.font.Font(None, size)
     text_surface = font.render(text, True, color)
@@ -153,6 +157,9 @@ class MusicPlayer(object):
         if self.is_playing:
             pygame.mixer.music.stop()
             self.is_playing = False
+
+    def set_Volume(self, volume):
+        pygame.mixer.music.set_volume(volume)
 
 class AnimatedSprite(pygame.sprite.Sprite):
     def __init__(self, position, frames, animation_speed=0.1):
@@ -312,6 +319,10 @@ class Mob(AnimatedSprite):
         self.sprite_height = 64
         self.cols = 4
         self.rows = 1
+
+        self.chasing = False
+        self.chase_distance = 200
+        self.chase_speed = 150
         
         # Load sprite sheet and create animation frames
         sprite_sheet = self.load_sprite_sheet("Golem_Run.png", self.cols, self.rows)
@@ -357,6 +368,19 @@ class Mob(AnimatedSprite):
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
         dist = math.sqrt(dx**2 + dy**2)
+
+        if not self.chasing:
+            if dist < self.chase_distance:
+                self.chasing = True
+                self.speed = self.chase_speed
+            else:
+                return
+        else:
+            if dist > self.chase_distance:
+                self.chasing = False
+                self.speed = 100
+                return
+        
         
         if dist > 0:
             # Normalize direction
@@ -416,9 +440,14 @@ def main():
         player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
         all_sprites.add(player)
 
-        music = MusicPlayer("2.Aria of the Soul(P4).mp3")
-        music.play()
+        defaultMusic = MusicPlayer(default_music)
+        chaseMusic = MusicPlayer(chase_music)
 
+        defaultMusic.play()
+        defaultMusic.set_Volume(1.0)
+
+        
+        
         mobs = pygame.sprite.Group()
         for i in range(5):
             mob = Mob(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT))
@@ -447,9 +476,26 @@ def main():
             
             # Update
             player.update(dt, walls, signs)
-            for mob in mobs:
-                mob.update(dt, player, walls)
+                        # Add a flag to track whether chase music is playing
+            chase_music_playing = False
             
+            # Inside the game loop
+            for mob in mobs:
+                    mob.update(dt, player, walls)
+                    if mob.chasing:
+                        if not chase_music_playing:
+                            defaultMusic.stop()
+                            chaseMusic.play()
+                            chaseMusic.set_Volume(1.0)
+                            chase_music_playing = True
+                        break
+            else:
+                    if chase_music_playing:
+                        chaseMusic.stop()
+                        defaultMusic.play()
+                        chase_music_playing = False
+
+                        
             # Check player-mob collisions
             collisions = pygame.sprite.spritecollide(player, mobs, False)
             if collisions:
@@ -469,7 +515,7 @@ def main():
             # Cap FPS and get delta time
             dt = clock.tick(FPS) / 1000
         
-        music.stop()
+        defaultMusic.stop()
         
         # Show game over screen if not quitting
         if running:
