@@ -2,6 +2,7 @@ import math
 import random
 import pygame
 import os
+import pytmx
 
 # Initialize pygame
 pygame.init()
