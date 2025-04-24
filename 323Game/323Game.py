@@ -614,7 +614,7 @@ def main():
     if not show_start_screen():
         return
     
-    tmx_data = pytmx.util_pygame.load_pygame(os.path.join("Maps", "TLSBNR_MainMap.tmx"))
+    tmx_data = pytmx.util_pygame.load_pygame(os.path.join("323Game", "Maps", "TLSBNR_MainMap.tmx"))
     
     wheel_cipher = WheelCipher()
     suspicion_system = SuspicionSystem()
