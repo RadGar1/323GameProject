@@ -14,12 +14,57 @@ PLAYER_SPEED = 300
 
 # Colors
 BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)  # Color for walls
 
 # Setup the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Lone Survivor")
 clock = pygame.time.Clock()
+
+def draw_text(surface, text, size, color, x, y):
+    font = pygame.font.Font(None, size)
+    text_surface = font.render(text, True, color)
+    text_rect = text_surface.get_rect(center=(x, y))
+    surface.blit(text_surface, text_rect)
+
+def show_start_screen():
+    screen.fill(BLACK)
+    draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
+    draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    draw_text(screen, "the last survivor but not really studios", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
+    draw_text(screen, "Press any key to begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4)
+    pygame.display.flip()
+    
+    waiting = True
+    while waiting:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return False
+            if event.type == pygame.KEYUP:
+                waiting = False
+    return True
+
+def show_game_over_screen():
+    screen.fill(BLACK)
+    draw_text(screen, "GAME OVER", 64, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
+    draw_text(screen, "Press any key to play again", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    pygame.display.flip()
+    
+    waiting = True
+    while waiting:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return False
+            if event.type == pygame.KEYUP:
+                waiting = False
+    return True
 
 class Wall(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
@@ -143,16 +188,16 @@ class Player(AnimatedSprite):
         keys = pygame.key.get_pressed()
         move_vec = pygame.Vector2(0, 0)
         
-        if keys[pygame.K_w]:
+        if keys[pygame.K_w] or keys[pygame.K_UP]:
             move_vec.y -= 1
             self.last_direction = "up"
-        if keys[pygame.K_s]:
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]:
             move_vec.y += 1
             self.last_direction = "down"
-        if keys[pygame.K_a]:
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
             move_vec.x -= 1
             self.last_direction = "left"
-        if keys[pygame.K_d]:
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
             move_vec.x += 1
             self.last_direction = "right"
             
@@ -270,67 +315,86 @@ class Mob(AnimatedSprite):
             self.rect.x = random.randrange(SCREEN_WIDTH - self.sprite_width)
             self.rect.y = random.randrange(-100, -50)
 
-# Game setup
-all_sprites = pygame.sprite.Group()
-walls = pygame.sprite.Group()  # Group for walls
 
-# Create some walls
-wall_positions = [
-    (100, 100, 200, 50),
-    (400, 300, 50, 200),
-    (700, 200, 200, 50),
-    (900, 500, 300, 50)
-]
-
-for x, y, w, h in wall_positions:
-    wall = Wall(x, y, w, h)
-    all_sprites.add(wall)
-    walls.add(wall)
-
-player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-all_sprites.add(player)
-
-music = MusicPlayer("2.Aria of the Soul(P4).mp3")
-music.play()
-
-mobs = pygame.sprite.Group()
-for i in range(5):
-    mob = Mob(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT))
-    all_sprites.add(mob)
-    mobs.add(mob)
-
-# Game loop
-running = True
-dt = 0  # Delta time
-
-while running:
-    # Event handling
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                running = False
+def main():
+    # Show the start screen
+    if not show_start_screen():
+        return
     
-    # Update
-    player.update(dt, walls)
-    for mob in mobs:
-        mob.update(dt, player, walls)
-    
-    # Check player-mob collisions
-    collisions = pygame.sprite.spritecollide(player, mobs, False)
-    if collisions:
-        print("Player hit by mob!")
-        running = False
-    
-    # Render
-    screen.fill(BLACK)
-    all_sprites.draw(screen)
-    
-    # Flip display
-    pygame.display.flip()
-    
-    # Cap FPS and get delta time
-    dt = clock.tick(FPS) / 1000
+    # Main game loop
+    running = True
+    while running:
+        # Game setup
+        all_sprites = pygame.sprite.Group()
+        walls = pygame.sprite.Group()
 
-pygame.quit()
+        # Create walls
+        wall_positions = [
+            (100, 100, 200, 50),
+            (400, 300, 50, 200),
+            (700, 200, 200, 50),
+            (900, 500, 300, 50)
+        ]
+
+        for x, y, w, h in wall_positions:
+            wall = Wall(x, y, w, h)
+            all_sprites.add(wall)
+            walls.add(wall)
+
+        player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        all_sprites.add(player)
+
+        music = MusicPlayer("2.Aria of the Soul(P4).mp3")
+        music.play()
+
+        mobs = pygame.sprite.Group()
+        for i in range(5):
+            mob = Mob(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT))
+            all_sprites.add(mob)
+            mobs.add(mob)
+
+        # Game play loop
+        playing = True
+        dt = 0
+        
+        while playing:
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    playing = False
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        playing = False
+                        running = False
+            
+            # Update
+            player.update(dt, walls)
+            for mob in mobs:
+                mob.update(dt, player, walls)
+            
+            # Check player-mob collisions
+            collisions = pygame.sprite.spritecollide(player, mobs, False)
+            if collisions:
+                playing = False
+            
+            # Render
+            screen.fill(BLACK)
+            all_sprites.draw(screen)
+            
+            # Flip display
+            pygame.display.flip()
+            
+            # Cap FPS and get delta time
+            dt = clock.tick(FPS) / 1000
+        
+        music.stop()
+        
+        # Show game over screen if not quitting
+        if running:
+            running = show_game_over_screen()
+
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
