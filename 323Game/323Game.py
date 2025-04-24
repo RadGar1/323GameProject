@@ -393,7 +393,8 @@ class Mob(AnimatedSprite):
                 self.wander_time -= dt
                 if self.wander_time <= 0:
                     self.wander_direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
-                    self.wander_direction = self.wander_direction.normalize()
+                    if self.wander_direction.length() > 0:
+                        self.wander_direction = self.wander_direction.normalize()
                     self.wander_time = random.uniform(2, 5)
                 
                 self.direction = self.wander_direction
@@ -403,14 +404,13 @@ class Mob(AnimatedSprite):
                 self.chasing = False
                 self.speed = 100
                 self.chase_distance = 200
-                return
-        
-        
-            if dist > 0:
+                #return
+            else:
+                if dist > 0:
                 # Normalize direction
-                dx /= dist
-                dy /= dist
-                self.direction = pygame.Vector2(dx, dy)
+                    dx /= dist
+                    dy /= dist
+                    self.direction = pygame.Vector2(dx, dy)
         
         # Call parent class update and get old position
         old_pos = super().update(dt)
