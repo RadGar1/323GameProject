@@ -1,3 +1,5 @@
+import math
+import random
 import pygame
 import os
 
@@ -17,6 +19,24 @@ GREEN = (0, 255, 0)
 # Setup the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 clock = pygame.time.Clock()
+
+class MusicPlayer(object):
+    def __init__(self, music_file):
+        pygame.mixer.init()
+        self.music_file = music_file
+        self.is_playing = False
+
+    def play(self):
+        if not self.is_playing:
+            pygame.mixer.music.load(self.music_file)
+            pygame.mixer.music.play(-1)  # Loop indefinitely
+            self.is_playing = True
+
+    def stop(self):
+        if self.is_playing:
+            pygame.mixer.music.stop()
+            self.is_playing = False
+
 
 class AnimatedSprite(pygame.sprite.Sprite):
     def __init__(self, position, frames, animation_speed=0.1):
@@ -47,65 +67,6 @@ class AnimatedSprite(pygame.sprite.Sprite):
         # Keep player on screen
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
         self.pos.x, self.pos.y = self.rect.center
-
-class Mob(AnimatedSprite):
-    def __init__(self, x, y):
-        # Sprite sheet dimensions
-        self.sprite_width = 80
-        self.sprite_height = 120
-        self.cols = 2
-        self.rows = 4
-        
-        # Load sprite sheet and create animation frames
-        sprite_sheet = self.load_sprite_sheet("NightBorne.png", self.cols, self.rows)
-        
-        # Organize animations by direction (assuming sprite sheet organization)
-        # Row 0: Down animation (2 frames)
-        # Row 1: Left animation (2 frames)
-        # Row 2: Right animation (2 frames)
-        # Row 3: Up animation (2 frames)
-        self.animations = {
-            "down": sprite_sheet[0:2],
-            "left": sprite_sheet[2:4],
-            "right": sprite_sheet[4:6],
-            "up": sprite_sheet[6:8]
-        }
-        
-        super().__init__((x, y), self.animations["down"])
-
-    def load_sprite_sheet(self, filename, cols, rows):
-        try:
-            full_path = os.path.join("Sprites", filename)
-            sprite_sheet = pygame.image.load(full_path).convert_alpha()
-        except:
-            # Fallback: create a placeholder sprite sheet if the file isn't found
-            print(f"Warning: Could not load {filename}, using placeholder")
-            sprite_sheet = pygame.Surface((cols * self.sprite_width, rows * self.sprite_height), pygame.SRCALPHA)
-            for row in range(rows):
-                for col in range(cols):
-                    x = col * self.sprite_width
-                    y = row * self.sprite_height
-                    color = (row * 60 % 255, 100 + col * 30 % 155, 50 + (row + col) * 20 % 205)
-                    pygame.draw.rect(sprite_sheet, color, (x, y, self.sprite_width, self.sprite_height))
-                    pygame.draw.rect(sprite_sheet, BLACK, (x, y, self.sprite_width, self.sprite_height), 1)
-                    # Draw direction indicator
-                    font = pygame.font.SysFont(None, 20)
-                    direction = ["Down", "Left", "Right", "Up"][row]
-                    text = font.render(f"{direction} {col+1}", True, BLACK)
-                    sprite_sheet.blit(text, (x + 5, y + 5))
-        
-        frames = []
-        for row in range(rows):
-            for col in range(cols):
-                frame = pygame.Surface((self.sprite_width, self.sprite_height), pygame.SRCALPHA)
-                frame.blit(sprite_sheet, (0, 0),
-                          (col * self.sprite_width,
-                           row * self.sprite_height,
-                           self.sprite_width,
-                           self.sprite_height))
-                frames.append(frame)
-        
-        return frames
 
 class Player(AnimatedSprite):
     def __init__(self, x, y):
@@ -210,10 +171,91 @@ class Player(AnimatedSprite):
         
         super().update(dt)
 
+class Mob(AnimatedSprite):
+    def __init__(self, x, y):
+        # Sprite sheet dimensions
+        self.sprite_width = 64
+        self.sprite_height = 64
+        self.cols = 4
+        self.rows = 1
+
+        # Starting position of the mob
+        self.rect = pygame.Rect(x, y, self.sprite_width, self.sprite_height)
+        
+        # Load sprite sheet and create animation frames
+        sprite_sheet = self.load_sprite_sheet("Golem_Run.png", self.cols, self.rows)
+        
+        # Organize animations by direction
+        self.animations = {
+            "down": sprite_sheet[0:2],
+            "left": sprite_sheet[2:4],
+            "right": sprite_sheet[4:6],
+            "up": sprite_sheet[6:8]
+        }
+        
+        super().__init__((x, y), self.animations["down"])
+
+        # Speed of mob
+        self.speed = 3  # Fixed speed for simplicity
+
+    def load_sprite_sheet(self, filename, cols, rows):
+        try:
+            full_path = os.path.join("Sprites", filename)
+            sprite_sheet = pygame.image.load(full_path).convert_alpha()
+        except:
+            # Fallback: create a placeholder sprite sheet if the file isn't found
+            print(f"Warning: Could not load {filename}, using placeholder")
+            sprite_sheet = pygame.Surface((cols * self.sprite_width, rows * self.sprite_height), pygame.SRCALPHA)
+            for row in range(rows):
+                for col in range(cols):
+                    x = col * self.sprite_width
+                    y = row * self.sprite_height
+                    color = (row * 60 % 255, 100 + col * 30 % 155, 50 + (row + col) * 20 % 205)
+                    pygame.draw.rect(sprite_sheet, color, (x, y, self.sprite_width, self.sprite_height))
+                    pygame.draw.rect(sprite_sheet, (0, 0, 0), (x, y, self.sprite_width, self.sprite_height), 1)
+        frames = []
+        for row in range(rows):
+            for col in range(cols):
+                frame = pygame.Surface((self.sprite_width, self.sprite_height), pygame.SRCALPHA)
+                frame.blit(sprite_sheet, (0, 0),
+                          (col * self.sprite_width,
+                           row * self.sprite_height,
+                           self.sprite_width,
+                           self.sprite_height))
+                frames.append(frame)
+        return frames
+
+    def update(self, dt, player):
+        # Get the direction to the player
+        dx = player.rect.centerx - self.rect.centerx
+        dy = player.rect.centery - self.rect.centery
+        
+        # Calculate distance to the player
+        distance = math.sqrt(dx**2 + dy**2)
+
+        # Prevent division by zero if distance is zero (same position)
+        if distance != 0:
+            # Normalize direction (unit vector)
+            dx /= distance
+            dy /= distance
+
+            # Update the mob's position to move towards the player
+            self.rect.x += dx * self.speed
+            self.rect.y += dy * self.speed
+
+        # If mob moves out of screen, reset position to top
+        if self.rect.top > SCREEN_HEIGHT + 15 or self.rect.left < -15 or self.rect.right > SCREEN_WIDTH + 15:
+            self.rect.x = random.randrange(SCREEN_WIDTH - self.sprite_width)
+            self.rect.y = random.randrange(-100, -50)
+
+
 # Game setup
 all_sprites = pygame.sprite.Group()
 player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 all_sprites.add(player)
+
+music = MusicPlayer("Molgera.mp3")
+music.play()
 
 mobs = pygame.sprite.Group()
 for i in range(5):
@@ -235,7 +277,10 @@ while running:
                 running = False
     
     # Update
-    all_sprites.update(dt)
+    #all_sprites.update(dt)
+    player.update(dt)
+    for mob in mobs:
+        mob.update(dt, player)
     
     # Render
     screen.fill(BLACK)
