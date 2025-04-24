@@ -17,11 +17,12 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)  # Color for walls
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
 
 # Setup the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Lone Survivor")
+pygame.display.set_caption("Adventure Game")
 clock = pygame.time.Clock()
 
 def draw_text(surface, text, size, color, x, y):
@@ -32,9 +33,9 @@ def draw_text(surface, text, size, color, x, y):
 
 def show_start_screen():
     screen.fill(BLACK)
-    draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
+    draw_text(screen, "ADVENTURE GAME", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
     draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-    draw_text(screen, "the last survivor but not really studios", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
+    draw_text(screen, "Press O to interact with objects", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
     draw_text(screen, "Press any key to begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4)
     pygame.display.flip()
     
@@ -66,12 +67,75 @@ def show_game_over_screen():
                 waiting = False
     return True
 
+def show_message_screen(message):
+    # Create a semi-transparent overlay
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))  # Semi-transparent black
+    
+    # Draw the overlay
+    screen.blit(overlay, (0, 0))
+    
+    # Draw message box
+    message_rect = pygame.Rect(SCREEN_WIDTH // 4, SCREEN_HEIGHT // 3, 
+                             SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3)
+    pygame.draw.rect(screen, WHITE, message_rect)
+    pygame.draw.rect(screen, BLACK, message_rect, 2)
+    
+    # Split message into lines that fit in the box
+    font = pygame.font.Font(None, 36)
+    words = message.split(' ')
+    lines = []
+    current_line = []
+    
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        if font.size(test_line)[0] < message_rect.width - 40:
+            current_line.append(word)
+        else:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+    if current_line:
+        lines.append(' '.join(current_line))
+    
+    # Draw each line of text
+    y_offset = message_rect.y + 20
+    for line in lines:
+        draw_text(screen, line, 36, BLACK, SCREEN_WIDTH // 2, y_offset)
+        y_offset += 40
+    
+    # Draw instruction to continue
+    draw_text(screen, "Press ENTER to continue", 36, BLACK, SCREEN_WIDTH // 2, message_rect.bottom - 40)
+    
+    pygame.display.flip()
+    
+    waiting = True
+    while waiting:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                waiting = False
+    return True
+
 class Wall(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
         super().__init__()
         self.image = pygame.Surface((width, height))
         self.image.fill(BLUE)
         self.rect = self.image.get_rect(topleft=(x, y))
+
+class Sign(pygame.sprite.Sprite):
+    def __init__(self, x, y, message):
+        super().__init__()
+        self.image = pygame.Surface((40, 60))
+        self.image.fill(YELLOW)
+        pygame.draw.rect(self.image, BLACK, (0, 0, 40, 60), 2)
+        draw_text(self.image, "!", 30, BLACK, 20, 30)
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.message = message
+        self.interact_rect = pygame.Rect(x - 50, y - 50, 140, 160)  # Larger area for interaction
 
 class MusicPlayer(object):
     def __init__(self, music_file):
@@ -150,6 +214,8 @@ class Player(AnimatedSprite):
         super().__init__((x, y), self.animations["down"])
         self.current_animation = "down"
         self.last_direction = "down"
+        self.can_interact = False
+        self.near_sign = None
         
     def load_sprite_sheet(self, filename, cols, rows):
         try:
@@ -183,7 +249,7 @@ class Player(AnimatedSprite):
                 frames.append(frame)
         return frames
     
-    def update(self, dt, walls):
+    def update(self, dt, walls, signs):
         # Get keyboard input
         keys = pygame.key.get_pressed()
         move_vec = pygame.Vector2(0, 0)
@@ -229,6 +295,15 @@ class Player(AnimatedSprite):
             # Move back if colliding
             self.pos = old_pos
             self.rect.center = self.pos
+        
+        # Check if near any signs
+        self.can_interact = False
+        self.near_sign = None
+        for sign in signs:
+            if self.rect.colliderect(sign.interact_rect):
+                self.can_interact = True
+                self.near_sign = sign
+                break
 
 class Mob(AnimatedSprite):
     def __init__(self, x, y):
@@ -237,10 +312,6 @@ class Mob(AnimatedSprite):
         self.sprite_height = 64
         self.cols = 4
         self.rows = 1
-
-        self.chasing = False
-        self.chase_distance = 200
-        self.chase_speed = 150
         
         # Load sprite sheet and create animation frames
         sprite_sheet = self.load_sprite_sheet("Golem_Run.png", self.cols, self.rows)
@@ -286,13 +357,6 @@ class Mob(AnimatedSprite):
         dx = player.rect.centerx - self.rect.centerx
         dy = player.rect.centery - self.rect.centery
         dist = math.sqrt(dx**2 + dy**2)
-
-        if not self.chasing:
-            if dist < self.chase_distance:
-                self.chasing = True
-                self.speed = self.chase_speed
-            else:
-                return
         
         if dist > 0:
             # Normalize direction
@@ -315,7 +379,6 @@ class Mob(AnimatedSprite):
             self.rect.x = random.randrange(SCREEN_WIDTH - self.sprite_width)
             self.rect.y = random.randrange(-100, -50)
 
-
 def main():
     # Show the start screen
     if not show_start_screen():
@@ -327,6 +390,7 @@ def main():
         # Game setup
         all_sprites = pygame.sprite.Group()
         walls = pygame.sprite.Group()
+        signs = pygame.sprite.Group()
 
         # Create walls
         wall_positions = [
@@ -340,6 +404,14 @@ def main():
             wall = Wall(x, y, w, h)
             all_sprites.add(wall)
             walls.add(wall)
+
+        # Create signs with messages
+        sign1 = Sign(300, 200, "Welcome to the adventure game! Press O to interact with signs like this one.")
+        sign2 = Sign(800, 400, "This is another sign with different text. Explore and find all the secrets!")
+        all_sprites.add(sign1)
+        all_sprites.add(sign2)
+        signs.add(sign1)
+        signs.add(sign2)
 
         player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
         all_sprites.add(player)
@@ -367,9 +439,14 @@ def main():
                     if event.key == pygame.K_ESCAPE:
                         playing = False
                         running = False
+                    elif event.key == pygame.K_o and player.can_interact:
+                        # Show the sign's message
+                        if not show_message_screen(player.near_sign.message):
+                            playing = False
+                            running = False
             
             # Update
-            player.update(dt, walls)
+            player.update(dt, walls, signs)
             for mob in mobs:
                 mob.update(dt, player, walls)
             
@@ -381,6 +458,10 @@ def main():
             # Render
             screen.fill(BLACK)
             all_sprites.draw(screen)
+            
+            # Show interaction prompt if near a sign
+            if player.can_interact:
+                draw_text(screen, "Press O to read", 24, WHITE, player.rect.centerx, player.rect.top - 20)
             
             # Flip display
             pygame.display.flip()
