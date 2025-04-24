@@ -3,6 +3,7 @@ import random
 import pygame
 import os
 import pytmx
+import pytmx
 
 # Initialize pygame
 pygame.init()
@@ -27,13 +28,18 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Lone Voyager")
 clock = pygame.time.Clock()
 
-def draw_text(surface, text, size, color, x, y, center=True):
-    font = pygame.font.Font(None, size)
-    text_surface = font.render(text, True, color)
-    if center:
-        text_rect = text_surface.get_rect(center=(x, y))
-    else:
-        text_rect = text_surface.get_rect(topleft=(x, y))
+# Load pixel font
+pixel_font13 = pygame.font.Font("PressStart2P-Regular.ttf", 13)
+pixel_font16 = pygame.font.Font("PressStart2P-Regular.ttf", 16)
+pixel_font24 = pygame.font.Font("PressStart2P-Regular.ttf", 24)
+pixel_font36 = pygame.font.Font("PressStart2P-Regular.ttf", 36)
+pixel_font64 = pygame.font.Font("PressStart2P-Regular.ttf", 64)
+
+def draw_text(surface, text, size, color, x, y, font=None):
+    if font is None:
+        font = pygame.font.Font(None, size) # Fallback
+    text_surface = font.render(text, False, color)
+    text_rect = text_surface.get_rect(center=(x, y))
     surface.blit(text_surface, text_rect)
 
 def draw_map(surface, tmx_data):
@@ -46,10 +52,10 @@ def draw_map(surface, tmx_data):
 
 def show_start_screen():
     screen.fill(BLACK)
-    draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
-    draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-    draw_text(screen, "P: Stun | O: Interact | I: Cipher Wheel", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
-    draw_text(screen, "Press any key to begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4)
+    draw_text(screen, "LONE VOYAGER", 64, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4, font=pixel_font64)
+    draw_text(screen, "WASD or Arrow Keys to Move", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, font=pixel_font36)
+    draw_text(screen, "Press O to Interact with Objects", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50, font=pixel_font36)
+    draw_text(screen, "Press Any Key to Begin", 36, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT * 3/4, font=pixel_font36)
     pygame.display.flip()
     
     waiting = True
@@ -65,8 +71,8 @@ def show_start_screen():
 
 def show_game_over_screen():
     screen.fill(BLACK)
-    draw_text(screen, "GAME OVER", 64, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4)
-    draw_text(screen, "Press any key to play again", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+    draw_text(screen, "GAME OVER", 64, RED, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 4, font=pixel_font64)
+    draw_text(screen, "Press Any Key to Play Again", 36, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, font=pixel_font36)
     pygame.display.flip()
     
     waiting = True
@@ -81,15 +87,20 @@ def show_game_over_screen():
     return True
 
 def show_message_screen(message):
+    # Create a semi-transparent overlay
     overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 180))
+    overlay.fill((0, 0, 0, 180))  # Semi-transparent black
+    
+    # Draw the overlay
     screen.blit(overlay, (0, 0))
     
+    # Draw message box
     message_rect = pygame.Rect(SCREEN_WIDTH // 4, SCREEN_HEIGHT // 3, 
                              SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3)
     pygame.draw.rect(screen, WHITE, message_rect)
     pygame.draw.rect(screen, BLACK, message_rect, 2)
     
+    # Split message into lines that fit in the box
     font = pygame.font.Font(None, 36)
     words = message.split(' ')
     lines = []
@@ -105,12 +116,14 @@ def show_message_screen(message):
     if current_line:
         lines.append(' '.join(current_line))
     
+    # Draw each line of text
     y_offset = message_rect.y + 20
     for line in lines:
-        draw_text(screen, line, 36, BLACK, SCREEN_WIDTH // 2, y_offset)
+        draw_text(screen, line, 13, BLACK, SCREEN_WIDTH // 2, y_offset, font=pixel_font13)
         y_offset += 40
     
-    draw_text(screen, "Press ENTER to continue", 36, BLACK, SCREEN_WIDTH // 2, message_rect.bottom - 40)
+    # Draw instruction to continue
+    draw_text(screen, "Press ENTER to continue", 24, BLACK, SCREEN_WIDTH // 2, message_rect.bottom - 40, font=pixel_font24)
     
     pygame.display.flip()
     
@@ -201,11 +214,12 @@ class WheelCipher:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
             self.visible = False
 
+
 class SuspicionSystem:
     def __init__(self):
         self.suspicion = 0
         self.max_suspicion = 100
-        self.increase_rate = 10
+        self.increase_rate = 2
         self.decrease_rate = 0.2
         self.high_suspicion_threshold = 80
         self.effective_suspicion = 0
@@ -458,9 +472,10 @@ class Mob(AnimatedSprite):
         self.chasing = False
         self.chase_distance = 200
         self.base_speed = 100
-        self.base_chase_speed = 150
+        self.chase_speed = 150
         self.speed = self.base_speed
-        self.chase_speed = self.base_chase_speed
+        self.chase_speed = self.chase_speed
+        self.wander_time = 0
         
         self.stunned = False
         self.stun_timer = 0
@@ -502,8 +517,8 @@ class Mob(AnimatedSprite):
         return frames
     
     def update_speed(self, suspicion_modifier):
-        self.speed = self.base_speed * suspicion_modifier
-        self.chase_speed = self.base_chase_speed * suspicion_modifier
+        self.speed = self.base_speed * (suspicion_modifier)
+        self.chase_speed = self.chase_speed * (suspicion_modifier)
         
         if self.chasing and not self.stunned:
             self.speed = self.chase_speed
@@ -511,6 +526,40 @@ class Mob(AnimatedSprite):
             self.speed = self.base_speed * suspicion_modifier
     
     def update(self, dt, player, walls):
+         # Get direction to player
+        dx = player.rect.centerx - self.rect.centerx
+        dy = player.rect.centery - self.rect.centery
+        dist = math.sqrt(dx**2 + dy**2)
+        
+        if not self.chasing:
+            if dist < self.chase_distance:
+                self.chasing = True
+                self.speed = self.chase_speed
+                self.chase_distance = 300
+            else:
+                self.wander_time -= dt
+                if self.wander_time <= 0:
+                    self.wander_direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+                    if self.wander_direction.length() > 0:
+                        self.wander_direction = self.wander_direction.normalize()
+                    self.wander_time = random.uniform(2, 5)
+                
+                self.direction = self.wander_direction
+                self.speed = self.base_speed
+        else:
+            if dist > self.chase_distance:
+                self.chasing = False
+                self.speed = 100
+                self.chase_distance = 200
+                #return
+            else:
+                if dist > 0:
+                # Normalize direction
+                    dx /= dist
+                    dy /= dist
+                    self.direction = pygame.Vector2(dx, dy)
+
+                    
         if self.stunned:
             self.stun_timer -= dt
             if self.stun_timer <= 0:
@@ -567,17 +616,23 @@ def main():
         return
     
     # Load the tmx map
-    tmx_data = pytmx.util_pygame.load_pygame(os.path.join("323Game","Maps", "TLSBNR_MainMap.tmx"))
-
+    tmx_data = pytmx.util_pygame.load_pygame(os.path.join("Maps", "LSBNR_MainMap.tmx"))
     
-    suspicion_system = SuspicionSystem()
     wheel_cipher = WheelCipher()
+    suspicion_system = SuspicionSystem()
     
     running = True
     while running:
         all_sprites = pygame.sprite.Group()
         walls = pygame.sprite.Group()
         signs = pygame.sprite.Group()
+
+        # Create walls from map objects
+        for obj in tmx_data.objects:
+            if obj.name == "Wall":
+                wall = Wall(obj.x, obj.y, obj.width, obj.height)
+                all_sprites.add(wall)
+                walls.add(wall)
 
         #wall_positions = [
         #    (100, 100, 200, 50),
@@ -634,10 +689,6 @@ def main():
                         if not show_message_screen(sign_text):
                             playing = False
                             running = False
-                    elif event.key == pygame.K_i:
-                        wheel_cipher.toggle()
-                    elif wheel_cipher.visible and event.key == pygame.K_RETURN:
-                        wheel_cipher.toggle()
             
             any_chasing = False
             for mob in mobs:
@@ -650,10 +701,7 @@ def main():
             for mob in mobs:
                 mob.update_speed(suspicion_modifier)
             
-            if not wheel_cipher.visible:
-                player.update(dt, walls, signs, mobs)
-            else:
-                wheel_cipher.update()
+            player.update(dt, walls, signs, mobs)
             
             if any_chasing:
                 if not chase_music_playing:
@@ -672,27 +720,20 @@ def main():
                 playing = False
             
             screen.fill(BLACK)
-            draw_map(screen, tmx_data)
             all_sprites.draw(screen)
             
             if player.can_interact:
                 draw_text(screen, "Press O to read", 24, WHITE, player.rect.centerx, player.rect.top - 20)
             
             suspicion_system.draw_effects(screen)
-            wheel_cipher.draw(screen, suspicion_system.suspicion)
             
             if player.stun_cooldown > 0:
                 cooldown_width = 200 * (1 - player.stun_cooldown / player.stun_cooldown_time)
                 pygame.draw.rect(screen, RED, (10, 10, cooldown_width, 20))
                 pygame.draw.rect(screen, WHITE, (10, 10, 200, 20), 2)
                 draw_text(screen, "Stun Cooldown", 20, WHITE, 110, 20)
-            elif not wheel_cipher.visible:
-                draw_text(screen, "Press P to stun nearby enemies", 24, WHITE, SCREEN_WIDTH // 2, 30)
-            
-            if wheel_cipher.visible:
-                draw_text(screen, "Press I to close cipher wheel", 24, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)
             else:
-                draw_text(screen, "Press I to open cipher wheel", 24, WHITE, SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)
+                draw_text(screen, "Press P to stun nearby enemies", 24, WHITE, SCREEN_WIDTH // 2, 30)
             
             pygame.display.flip()
             dt = clock.tick(FPS) / 1000
