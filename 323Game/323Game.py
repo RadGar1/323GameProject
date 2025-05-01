@@ -201,7 +201,7 @@ class WheelCipher:
         surface.blit(overlay, (0, 0))
         
         pygame.draw.circle(surface, WHITE, (self.center_x, self.center_y), self.radius, 2)
-        pygame.draw.circle(surface, WHITE, (self.center_x, self.center_y), self.radius // 2, 2)
+        pygame.draw.circle(surface, WHITE, (self.center_x, self.center_y), self.radius // 1.5, 2)
         
         for i, letter in enumerate(self.outer_letters):
             angle = math.radians(self.outer_angle + i * (360 / len(self.outer_letters)))
@@ -216,8 +216,8 @@ class WheelCipher:
         
         for i, number in enumerate(self.inner_numbers):
             angle = math.radians(i * (360 / len(self.inner_numbers)))
-            x = self.center_x + (self.radius // 2 - 20) * math.cos(angle)
-            y = self.center_y + (self.radius // 2 - 20) * math.sin(angle)
+            x = self.center_x + (self.radius // 1.5 - 20) * math.cos(angle)
+            y = self.center_y + (self.radius // 1.5 - 20) * math.sin(angle)
             draw_text(surface, number, 30, GREEN, x, y)
             
             if suspicion_level > 80 and number == "4":
